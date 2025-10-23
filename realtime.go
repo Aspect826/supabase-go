@@ -9,19 +9,20 @@ import (
 	"nhooyr.io/websocket"
 )
 
-// Client provides Supabase Realtime access with verbose debug output.
+// Client provides Supabase Realtime access with optional debug logs.
 type Client struct {
 	URL   string
 	Key   string
 	conn  *websocket.Conn
-	Debug bool
+	Debug bool // <— add this
 }
 
+// New creates a new realtime client.
 func New(baseURL, key string) *Client {
 	return &Client{URL: baseURL, Key: key}
 }
 
-// Connect opens the websocket connection and prints debug info.
+// Connect opens the websocket connection.
 func (c *Client) Connect(ctx context.Context) error {
 	wsURL := fmt.Sprintf("%s/realtime/v1/websocket?apikey=%s&vsn=1.0.0",
 		c.URL, url.QueryEscape(c.Key))
@@ -52,32 +53,27 @@ func (c *Client) Connect(ctx context.Context) error {
 	if c.Debug {
 		fmt.Println("[DEBUG] Sending join payload:", string(data))
 	}
-	err = conn.Write(ctx, websocket.MessageText, data)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return conn.Write(ctx, websocket.MessageText, data)
 }
 
 // Subscribe starts the read loop with debug output.
 func (c *Client) Subscribe(ctx context.Context, handler func(map[string]any)) error {
 	if c.conn == nil {
-		return fmt.Errorf("no connection")
+		return fmt.Errorf("no connection established")
 	}
 
 	go func() {
 		for {
 			_, msg, err := c.conn.Read(ctx)
 			if err != nil {
-				fmt.Println("[DEBUG] websocket read error:", err)
+				if c.Debug {
+					fmt.Println("[DEBUG] websocket read error:", err)
+				}
 				return
 			}
-
 			if c.Debug {
 				fmt.Println("[DEBUG] RAW message:", string(msg))
 			}
-
 			var payload map[string]any
 			if json.Unmarshal(msg, &payload) == nil {
 				handler(payload)
@@ -87,6 +83,7 @@ func (c *Client) Subscribe(ctx context.Context, handler func(map[string]any)) er
 	return nil
 }
 
+// Disconnect closes the connection gracefully.
 func (c *Client) Disconnect() {
 	if c.conn != nil {
 		_ = c.conn.Close(websocket.StatusNormalClosure, "normal close")
