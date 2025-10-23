@@ -33,10 +33,20 @@ func (c *Client) Connect(ctx context.Context) error {
 	c.conn = conn
 
 	join := map[string]any{
-		"topic":   "realtime:public:*",
-		"event":   "phx_join",
-		"payload": map[string]any{},
-		"ref":     "1",
+		"topic": "realtime:public:tasks",
+		"event": "phx_join",
+		"payload": map[string]any{
+			"config": map[string]any{
+				"postgres_changes": []map[string]string{
+					{
+						"event":  "*",
+						"schema": "public",
+						"table":  "tasks",
+					},
+				},
+			},
+		},
+		"ref": "1",
 	}
 	data, _ := json.Marshal(join)
 	return conn.Write(ctx, websocket.MessageText, data)
